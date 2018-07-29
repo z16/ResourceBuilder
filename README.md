@@ -4,7 +4,7 @@ Parses Windower resource files (as output by [ResourceExtractor](https://github.
 
 ### Usage
 
-Invoke the executable with two parameters, first the directory to the FFXI install, second the path to the resources.
+Invoke the executable with two parameters, first the directory of the modified resource files, second the directory to the FFXI install.
 
 The resulting DAT files will be written to the resources directory, so they will not automatically take effect in-game. Back up existing FFXI DATs first, then copy the new ones to the game directory.
 
