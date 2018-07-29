@@ -6,6 +6,8 @@
 #include <vector>
 #include <iterator>
 
+auto validate = false;
+
 struct file
 {
     std::string directory;
@@ -16,7 +18,7 @@ struct file
 };
 
 std::vector<file> files{
-    {"ROM\\118", "106.DAT", 0x0001, 0x1000, 0x18},
+    {"ROM\\118", "106.DAT", 0x0000, 0x1000, 0x18},
     {"ROM\\118", "107.DAT", 0x1000, 0x2000, 0x1C},
     {"ROM\\118", "110.DAT", 0x2000, 0x2200, 0x18},
     {"ROM\\301", "115.DAT", 0x2200, 0x2800, 0x18},
@@ -25,7 +27,7 @@ std::vector<file> files{
     {"ROM\\286", "73.DAT",  0x5A00, 0x7000, 0x2C},
     {"ROM\\217", "21.DAT",  0x7000, 0x7400, 0x54},
     //{"ROM\\288", "67.DAT",  0xF000, 0xF200, 0x70},
-    {"ROM\\174", "48.DAT",  0xFFFF, 0x0000, 0x10},
+    //{"ROM\\174", "48.DAT",  0xFFFF, 0x0000, 0x10},
 };
 
 template<typename T>
@@ -192,15 +194,14 @@ void print(T value, Args... rest)
     print(rest...);
 }
 
-template<typename... Args>
-void assert(bool condition, item const& item, Args... args)
+template<typename T, typename... Args>
+void assert(bool condition, T id, Args... args)
 {
     if (condition)
         return;
 
-    std::cout << "  > violation for " << item.id << ": ";
+    std::cout << "  > violation for " << id << ": ";
     print(args...);
-    std::cout << std::endl;
 }
 
 std::size_t index(std::ifstream& in)
@@ -254,27 +255,30 @@ void write_strings(std::ofstream& out, item const& item, std::ifstream& in)
 
         entry.value = {reinterpret_cast<char*>(buffer), buffer_size};
 
-        if (entry.type == string_type::string)
+        if (validate)
         {
-            assert(buffer[0] == 1, item, "String buffer start not 0x01", i);
-            for (auto j = 1; j < 0x1C; ++j)
+            if (entry.type == string_type::string)
             {
-                assert(buffer[j] == 0, item, "String buffer not 0x00", i, j);
-            }
+                assert(buffer[0] == 1, item.id, "String buffer start not 0x01", i);
+                for (auto j = 1; j < 0x1C; ++j)
+                {
+                    assert(buffer[j] == 0, item.id, "String buffer not 0x00", i, j);
+                }
 
-            if (i < count - 1)
-            {
-                auto length = strlen(entry.value.data() + 0x1C);
-                assert((length + 4 & ~3) == buffer_size - 0x1C, item, "Mismatched string size", i);
+                if (i < count - 1)
+                {
+                    auto length = strlen(entry.value.data() + 0x1C);
+                    assert((length + 4 & ~3) == buffer_size - 0x1C, item.id, "Mismatched string size", i);
+                }
             }
-        }
-        else if (entry.type == string_type::other)
-        {
-            assert(buffer_size == 4, item, "Other buffer > 4", i);
-        }
-        else
-        {
-            assert(false, item, "Other other?");
+            else if (entry.type == string_type::other)
+            {
+                assert(buffer_size == 4, item.id, "Other buffer > 4", i);
+            }
+            else
+            {
+                assert(false, item.id, "Other other?");
+            }
         }
 
         delete[] buffer;
@@ -378,10 +382,14 @@ void write_item(std::ofstream& out, item const& item, std::streamoff string_offs
     write_strings(out, item, in);
 }
 
-int main(int _, char** paths)
+int main(int argc, char** argv)
 {
-    std::filesystem::path resources_path{paths[1]};
-    std::filesystem::path pol_path{paths[2]};
+    std::filesystem::path resources_path{argv[1]};
+    std::filesystem::path pol_path{argv[2]};
+    if (argc >= 4)
+    {
+        validate = argv[3] == std::string{"true"};
+    }
 
     ::items items{resources_path};
 
@@ -397,19 +405,21 @@ int main(int _, char** paths)
 
         for (auto i = file.min_id; i < file.max_id; ++i)
         {
-            auto base = 0xC00 * (i - file.min_id);
-            seek(out, base, in);
-
-            if (!items.contains(i))
+            if (items.contains(i))
             {
-                seek(out, base + 0xC00, in);
-                continue;
+                write_item(out, items[i], file.string_offset, in);
             }
 
-            write_item(out, items[i], file.string_offset, in);
+            seek(out, 0xC00 * (i - file.min_id + 1), in);
         }
 
-        out << in.rdbuf();
+        if (validate && file.min_id != 0xFFFF)
+        {
+            auto current = in.tellg();
+            in.seekg(0, std::ios_base::end);
+            auto last = in.tellg();
+            assert(current == last, "file size", "Input file not fully processed", last - current, static_cast<double>(last - current) / 0xC00);
+        }
     }
 
     std::cout << "Done!" << std::endl;
