@@ -10,7 +10,7 @@ auto validate = false;
 
 struct file
 {
-    std::string directory;
+    std::filesystem::path directory;
     std::string filename;
     std::uint16_t min_id;
     std::uint16_t max_id;
@@ -388,6 +388,8 @@ int main(int argc, char** argv)
     std::filesystem::path pol_path{argv[2]};
 
     auto decode = false;
+    auto backup = false;
+    auto restore = false;
 
     for (auto i = 3; i < argc; ++i)
     {
@@ -400,63 +402,112 @@ int main(int argc, char** argv)
         {
             decode = true;
         }
-    }
-
-    ::items items{resources_path};
-
-    for (auto const& file : files)
-    {
-        std::cout << "Doing " << file.directory << "/" << file.filename << std::endl;
-        std::cout << "  > Reading from: " << (pol_path / file.directory / file.filename).string().c_str() << std::endl;
-        std::cout << "  > Writing to: " << (resources_path / file.directory / file.filename).string().c_str() << std::endl;
-
-        auto out_directory = resources_path / file.directory;
-        std::filesystem::create_directories(out_directory);
-
-        std::ifstream in{pol_path / file.directory / file.filename, std::ios::binary};
-        std::ofstream out{out_directory / file.filename, std::ios::binary};
-
-        for (auto i = file.min_id; i < file.max_id; ++i)
+        else if (arg == "--backup")
         {
-            if (items.contains(i))
-            {
-                write_item(out, items[i], file.string_offset, in);
-            }
-
-            seek(out, 0xC00 * (i - file.min_id + 1), in);
+            backup = true;
         }
-
-        if (validate && file.min_id != 0xFFFF)
+        else if (arg == "--restore")
         {
-            auto current = in.tellg();
-            in.seekg(0, std::ios_base::end);
-            auto last = in.tellg();
-            assert(current == last, "file size", "Input file not fully processed", last - current, static_cast<double>(last - current) / 0xC00);
+            backup = true;
         }
     }
 
-    if (decode)
+    std::cout << std::endl;
+
+    if (restore)
     {
         for (auto const& file : files)
         {
-            auto dec_directory = resources_path / "DEC" / file.directory;
-            std::filesystem::create_directories(dec_directory);
+            auto bak_file = resources_path / "backup" / file.directory / file.filename;
+            if (!std::filesystem::exists(bak_file))
+            {
+                std::cout << "No backup file found for " << (file.directory / file.filename).string() << std::endl;
+                continue;
+            }
 
-            std::ifstream out{resources_path / file.directory / file.filename, std::ios::binary};
-            std::ofstream dec{dec_directory / file.filename, std::ios::binary};
+            std::filesystem::copy_file(bak_file, pol_path / file.directory / file.filename, std::filesystem::copy_options::overwrite_existing);
+            std::cout << "Restored " << (file.directory / file.filename).string() << std::endl;
+        }
+    }
+    else
+    {
+        ::items items{resources_path};
+
+        for (auto const& file : files)
+        {
+            std::cout << "Doing " << file.directory << "/" << file.filename << std::endl;
+            std::cout << "  > Reading from: " << (pol_path / file.directory / file.filename).string().c_str() << std::endl;
+            std::cout << "  > Writing to: " << (resources_path / file.directory / file.filename).string().c_str() << std::endl;
+
+            auto out_directory = resources_path / "results" / file.directory;
+            std::filesystem::create_directories(out_directory);
+
+            std::ifstream in{pol_path / file.directory / file.filename, std::ios::binary};
+            std::ofstream out{out_directory / file.filename, std::ios::binary};
 
             for (auto i = file.min_id; i < file.max_id; ++i)
             {
-                std::uint8_t buffer[0xC00];
-                out.read(reinterpret_cast<char*>(buffer), sizeof buffer);
-                for (auto& value : buffer)
+                if (items.contains(i))
                 {
-                    value = value << 3 | value >> 5;
+                    write_item(out, items[i], file.string_offset, in);
                 }
-                dec.write(reinterpret_cast<char*>(buffer), sizeof buffer);
+
+                seek(out, 0xC00 * (i - file.min_id + 1), in);
+            }
+
+            if (validate && file.min_id != 0xFFFF)
+            {
+                auto current = in.tellg();
+                in.seekg(0, std::ios_base::end);
+                auto last = in.tellg();
+                assert(current == last, "file size", "Input file not fully processed", last - current, static_cast<double>(last - current) / 0xC00);
+            }
+        }
+
+        if (decode)
+        {
+            std::cout << std::endl;
+
+            for (auto const& file : files)
+            {
+                auto dec_directory = resources_path / "decoded" / file.directory;
+                std::filesystem::create_directories(dec_directory);
+
+                std::ifstream out{resources_path / file.directory / file.filename, std::ios::binary};
+                std::ofstream dec{dec_directory / file.filename, std::ios::binary};
+
+                for (auto i = file.min_id; i < file.max_id; ++i)
+                {
+                    std::uint8_t buffer[0xC00];
+                    out.read(reinterpret_cast<char*>(buffer), sizeof buffer);
+                    for (auto& value : buffer)
+                    {
+                        value = value << 3 | value >> 5;
+                    }
+                    dec.write(reinterpret_cast<char*>(buffer), sizeof buffer);
+                }
+
+                std::cout << "Decoded " << (dec_directory / file.filename).string() << std::endl;
+            }
+        }
+
+        if (backup)
+        {
+            std::cout << std::endl;
+
+            for (auto const& file : files)
+            {
+                auto bak_directory = resources_path / "backup" / file.directory;
+                std::filesystem::create_directories(bak_directory);
+
+                std::filesystem::copy_file(pol_path / file.directory / file.filename, bak_directory / file.filename, std::filesystem::copy_options::overwrite_existing);
+
+                std::cout << "Backed up " << (bak_directory / file.filename).string() << std::endl;
             }
         }
     }
+
+    std::cout << std::endl;
 
     std::cout << "Done!" << std::endl;
 

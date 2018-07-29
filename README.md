@@ -10,9 +10,11 @@ Required parameters:
 
 Optional flags:
 * `--validate` Enables basic validation of some of the assumptions used for its algorithms, otherwise it will proceed with no assumptions, which is riskier but faster.
-* '--decode' Will generate decoded DAT files in addition to the proper files for the game (in its own folder `DEC/`)
+* `--decode` Will generate decoded DAT files in addition to the proper files for the game (in its own folder `decoded/`).
+* `--backup` Will back up current FFXI files in folder `backup/`. Off by default, since it doesn't overwrite them by default either. Will always overwrite existing backups if used, so if the game files were modified this will back up the modified files and possibly overwrite existing backups.
+* `--restore` Will restore game files from existing backups. Will not run the builder mechanism and abort immediately upon restoring the backups.
 
-The resulting DAT files will be written to the resources directory, so they will not automatically take effect in-game. Back up existing FFXI DATs first, then copy the new ones to the game directory. The decoded files will be here as well.
+The resulting DAT files will be written to the resources directory (sub folder `results/`), so they will not automatically take effect in-game. Back up existing FFXI DATs first, then copy the new ones to the game directory. The decoded files will be here as well.
 
 ### Not yet implemented
 
