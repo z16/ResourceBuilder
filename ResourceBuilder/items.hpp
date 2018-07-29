@@ -30,10 +30,10 @@ struct item
     std::optional<std::uint16_t> delay;
     std::optional<std::uint8_t> skill;
     std::optional<std::map<std::uint16_t, std::int8_t>> tp_moves;
-    std::string en;
-    std::string enp;
-    std::string enl;
-    std::string endesc;
+    std::optional<std::string> en;
+    std::optional<std::string> enp;
+    std::optional<std::string> enl;
+    std::optional<std::string> endesc;
 };
 
 class items
@@ -45,7 +45,7 @@ public:
     item const& operator[](int) const;
 
 private:
-    std::map<int, item> const& data() const;
+    std::map<int, item> data;
 
     std::filesystem::path resources_path;
 };

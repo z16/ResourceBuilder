@@ -208,10 +208,12 @@ std::size_t index(std::ifstream& in)
     return in.tellg() % 0xC00;
 }
 
-void adjust_entry(string_entry& entry, std::string const& value)
+void adjust_entry(string_entry& entry, std::optional<std::string> const& option)
 {
-    if (value.empty())
+    if (!option.has_value())
         return;
+
+    auto const& value = option.value();
 
     auto size = 0x1C + value.size() + 4 & ~3;
     auto buffer = new char[size]{};
@@ -400,8 +402,6 @@ int main(int _, char** paths)
 
             if (!items.contains(i))
             {
-                advance(out, file.string_offset, in);
-                write_strings(out, {i}, in);
                 seek(out, base + 0xC00, in);
                 continue;
             }

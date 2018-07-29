@@ -11,6 +11,9 @@
 template<typename T>
 void parse_resources(std::filesystem::path const& path, std::function<void(T&, std::string_view, std::string const&)> mapper, std::map<int, T>& map)
 {
+    if (!std::filesystem::exists(path))
+        return;
+
     std::ifstream file{path};
     std::string line;
     while (std::getline(file, line))
@@ -109,12 +112,4 @@ void parse_resources(std::filesystem::path const& path, std::function<void(T&, s
             }
         }
     }
-}
-
-template<typename T>
-std::map<int, T> parse_resources(std::filesystem::path const& path, std::function<void(T&, std::string_view, std::string const&)> mapper)
-{
-    std::map<int, T> map{};
-    parse_resources(path, mapper, map);
-    return map;
 }
