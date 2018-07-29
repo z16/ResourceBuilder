@@ -4,9 +4,15 @@ Parses Windower resource files (as output by [ResourceExtractor](https://github.
 
 ### Usage
 
-Invoke the executable with two parameters, first the directory of the modified resource files, second the directory to the FFXI install. A third optional parameter can be `true` to enable basic validation of some of the assumptions used for its algorithms, otherwise it will proceed with no assumptions, which is riskier but faster.
+Required parameters:
+1. Directory of the modified resource files to use as a template
+2. Directory of the FFXI installation to read DAT files from
 
-The resulting DAT files will be written to the resources directory, so they will not automatically take effect in-game. Back up existing FFXI DATs first, then copy the new ones to the game directory.
+Optional flags:
+* `--validate` Enables basic validation of some of the assumptions used for its algorithms, otherwise it will proceed with no assumptions, which is riskier but faster.
+* '--decode' Will generate decoded DAT files in addition to the proper files for the game (in its own folder `DEC/`)
+
+The resulting DAT files will be written to the resources directory, so they will not automatically take effect in-game. Back up existing FFXI DATs first, then copy the new ones to the game directory. The decoded files will be here as well.
 
 ### Not yet implemented
 

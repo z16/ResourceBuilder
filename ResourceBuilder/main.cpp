@@ -386,9 +386,20 @@ int main(int argc, char** argv)
 {
     std::filesystem::path resources_path{argv[1]};
     std::filesystem::path pol_path{argv[2]};
-    if (argc >= 4)
+
+    auto decode = false;
+
+    for (auto i = 3; i < argc; ++i)
     {
-        validate = argv[3] == std::string{"true"};
+        auto arg = std::string{argv[i]};
+        if (arg == "--validate")
+        {
+            validate = true;
+        }
+        else if (arg == "--decode")
+        {
+            decode = true;
+        }
     }
 
     ::items items{resources_path};
@@ -398,10 +409,12 @@ int main(int argc, char** argv)
         std::cout << "Doing " << file.directory << "/" << file.filename << std::endl;
         std::cout << "  > Reading from: " << (pol_path / file.directory / file.filename).string().c_str() << std::endl;
         std::cout << "  > Writing to: " << (resources_path / file.directory / file.filename).string().c_str() << std::endl;
+
         auto out_directory = resources_path / file.directory;
         std::filesystem::create_directories(out_directory);
+
         std::ifstream in{pol_path / file.directory / file.filename, std::ios::binary};
-        std::ofstream out{resources_path / file.directory / file.filename, std::ios::binary};
+        std::ofstream out{out_directory / file.filename, std::ios::binary};
 
         for (auto i = file.min_id; i < file.max_id; ++i)
         {
@@ -419,6 +432,29 @@ int main(int argc, char** argv)
             in.seekg(0, std::ios_base::end);
             auto last = in.tellg();
             assert(current == last, "file size", "Input file not fully processed", last - current, static_cast<double>(last - current) / 0xC00);
+        }
+    }
+
+    if (decode)
+    {
+        for (auto const& file : files)
+        {
+            auto dec_directory = resources_path / "DEC" / file.directory;
+            std::filesystem::create_directories(dec_directory);
+
+            std::ifstream out{resources_path / file.directory / file.filename, std::ios::binary};
+            std::ofstream dec{dec_directory / file.filename, std::ios::binary};
+
+            for (auto i = file.min_id; i < file.max_id; ++i)
+            {
+                std::uint8_t buffer[0xC00];
+                out.read(reinterpret_cast<char*>(buffer), sizeof buffer);
+                for (auto& value : buffer)
+                {
+                    value = value << 3 | value >> 5;
+                }
+                dec.write(reinterpret_cast<char*>(buffer), sizeof buffer);
+            }
         }
     }
 
