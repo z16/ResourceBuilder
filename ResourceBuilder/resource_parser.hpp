@@ -9,7 +9,7 @@
 #include <filesystem>
 
 template<typename T>
-void parse_resources(std::filesystem::path const& path, std::function<void(T&, std::string_view, std::string const&)> mapper, std::map<int, T>& map)
+void parse_resources(std::filesystem::path const& path, std::function<void(T&, std::string const&, std::string const&)> mapper, std::map<int, T>& map)
 {
     if (!std::filesystem::exists(path))
         return;
@@ -19,12 +19,11 @@ void parse_resources(std::filesystem::path const& path, std::function<void(T&, s
     while (std::getline(file, line))
     {
         if (line.compare(0, 5, "    [") != 0)
-        {
             continue;
-        }
 
         auto id_start = line.find('[') + 1;
-        auto id = std::stoi(line.substr(id_start, line.find(']') - id_start));
+        auto id_end = line.find(']');
+        auto id = std::stoi(line.substr(id_start, id_end - id_start));
         auto found = map.find(id) != map.end();
         if (!found)
         {
@@ -34,82 +33,67 @@ void parse_resources(std::filesystem::path const& path, std::function<void(T&, s
         }
         T& entry = map.at(id);
 
-        auto index = line.find('{') + 1;
+        std::string key, value;
+        auto current = &key;
 
-        std::string_view key;
-
-        auto quote = false;
-        auto escaped = false;
-        auto key_index = index;
-        std::size_t value_index = 0;
-        std::size_t quote_end = 0;
-        for (; index < line.size(); ++index)
+        auto in_quote = false;
+        auto in_escape = false;
+        for (auto c : std::string_view{line.c_str() + id_end + 5})
         {
-            auto c = line[index];
-            if (quote && c != '"')
+            if (in_escape)
             {
-                continue;
-            }
-
-            switch (c)
-            {
-            case '\\':
-                escaped = true;
-                ++index;
-                break;
-
-            case '"':
-                if (!quote && value_index == index)
+                if (c == 'n')
                 {
-                    quote = true;
-                    ++value_index;
-                }
-                else if (quote)
-                {
-                    quote_end = index;
-                    quote = false;
-                }
-                break;
-
-            case '=':
-                key = {line.c_str() + key_index, index - key_index};
-                value_index = index + 1;
-                break;
-
-            case ',':
-            case '}':
-                if (quote_end > value_index && quote_end < index - 1)
-                {
-                    break;
-                }
-
-                if (!escaped)
-                {
-                    mapper(entry, key, {line.c_str() + value_index, (quote_end > value_index ? quote_end : index) - value_index});
+                    current->push_back('\n');
                 }
                 else
                 {
-                    std::string value{line.c_str() + value_index, (quote_end > value_index ? quote_end : index) - value_index};
-                    std::size_t pos = 0;
-                    while ((pos = value.find("\\\"", pos)) != std::string::npos)
+                    if (c == '"')
                     {
-                        value.replace(pos, 2, "\"");
+                        in_quote = !in_quote;
                     }
-                    pos = 0;
-                    while ((pos = value.find("\\\n", pos)) != std::string::npos)
-                    {
-                        value.replace(pos, 2, "\n");
-                    }
-                    mapper(entry, key, value);
+
+                    current->push_back(c);
                 }
-                if (c == '}')
-                {
-                    break;
-                }
-                key_index = index + 1;
-                quote_end = 0;
-                break;
+
+                in_escape = false;
+                continue;
             }
+
+            if (c == '\\')
+            {
+                in_escape = !in_escape;
+                continue;
+            }
+
+            if (in_quote)
+            {
+                current->push_back(c);
+                continue;
+            }
+
+            if (c == '"')
+                continue;
+
+            if (c == '=')
+            {
+                current = &value;
+                continue;
+            }
+
+            if (c == ',' || c == '}')
+            {
+                mapper(entry, key, value);
+                if (c == '}')
+                    break;
+
+                key = {};
+                value = {};
+                current = &key;
+                continue;
+            }
+
+            current->push_back(c);
         }
     }
 }

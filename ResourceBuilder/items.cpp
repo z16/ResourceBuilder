@@ -10,7 +10,7 @@
 items::items(std::filesystem::path windower_path) :
     resources_path{std::move(windower_path)}
 {
-    parse_resources<item>(resources_path / "items.lua", [&](item& item, std::string_view const key, std::string const& value)
+    parse_resources<item>(resources_path / "items.lua", [&](item& item, std::string const& key, std::string const& value)
     {
              if (key == "id")             item.id             = std::stoi(value);
         else if (key == "en")             item.en             = value;
@@ -36,7 +36,7 @@ items::items(std::filesystem::path windower_path) :
         else if (key == "skill")          item.skill          = std::stoi(value);
     }, data);
 
-    parse_resources<item>(resources_path / "item_descriptions.lua", [&](item& item, std::string_view const key, std::string const& value)
+    parse_resources<item>(resources_path / "item_descriptions.lua", [&](item& item, std::string const& key, std::string const& value)
     {
              if (key == "en")             item.endesc         = value;
     }, data);
