@@ -21,4 +21,3 @@ The resulting DAT files will be written to the resources directory (sub folder `
 Currently only supports item resources, all other resources cannot be modified.
 
 Does not yet support Japanese DAT files.
-

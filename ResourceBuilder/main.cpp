@@ -408,7 +408,7 @@ int main(int argc, char** argv)
         }
         else if (arg == "--restore")
         {
-            backup = true;
+            restore = true;
         }
     }
 
