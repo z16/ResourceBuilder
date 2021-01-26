@@ -2,6 +2,7 @@
 
 #include "resource_parser.hpp"
 
+#include <cstdint>
 #include <string>
 #include <map>
 #include <filesystem>
@@ -37,13 +38,17 @@ struct item {
 
 class items {
 public:
+	static const std::size_t entry_size = 0xC00;
+	static const std::size_t string_offset = 0x280;
+	static const std::size_t string_size = entry_size - string_offset;
+
 	items(std::filesystem::path);
 
-	bool contains(int) const;
-	item const& operator[](int) const;
+	bool contains(std::uint32_t) const;
+	item const& operator[](std::uint32_t) const;
 
 private:
-	std::map<int, item> data;
+	std::map<std::uint32_t, item> data;
 
 	std::filesystem::path resources_path;
 };

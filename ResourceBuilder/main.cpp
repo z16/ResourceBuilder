@@ -1,9 +1,11 @@
 #include "items.hpp"
 
+#include <cstdint>
 #include <iostream>
 #include <filesystem>
 #include <fstream>
 #include <vector>
+#include <array>
 #include <iterator>
 
 auto validate = false;
@@ -38,21 +40,23 @@ void write_basic(std::ofstream& out, T const& value, std::ifstream& in) {
 	in.seekg(sizeof value, std::ios_base::cur);
 }
 
-void advance(std::ofstream& out, std::streamoff offset, std::ifstream& in) {
-	auto buffer = new char[offset];
-	in.read(buffer, offset);
-	out.write(buffer, offset);
-	delete[] buffer;
+template<std::size_t N>
+void advance(std::ofstream& out, std::ifstream& in, std::streamoff offset = N) {
+	static auto buffer = std::array<char, N>{};
+	buffer = {};
+	in.read(buffer.data(), offset);
+	out.write(buffer.data(), offset);
 }
 
+template<std::size_t N>
 void seek(std::ofstream& out, std::streampos pos, std::ifstream& in) {
-	advance(out, pos - out.tellp(), in);
+	advance<N>(out, in, pos - out.tellp());
 }
 
 template<typename T>
 void write(std::ofstream& out, std::optional<T> const& entry, std::ifstream& in) {
 	if (!entry.has_value()) {
-		advance(out, sizeof entry.value(), in);
+		advance<sizeof entry.value()>(out, in);
 		return;
 	}
 
@@ -62,7 +66,7 @@ void write(std::ofstream& out, std::optional<T> const& entry, std::ifstream& in)
 template<typename T>
 void write(std::ofstream& out, std::optional<T> const& entry, std::ifstream& in, std::function<T(T)> selector) {
 	if (!entry.has_value()) {
-		advance(out, sizeof entry.value(), in);
+		advance<sizeof entry.value()>(out, in);
 		return;
 	}
 
@@ -81,13 +85,13 @@ void write_armor(std::ofstream& out, item const& item, std::ifstream& in) {
 	write(out, item.jobs, in);
 
 	write(out, item.superior_level, in);
-	advance(out, 1, in);
+	advance<1>(out, in);
 	write(out, item.shield_size, in);
 	write(out, item.max_charges, in);
 	write<std::uint8_t>(out, item.cast_time, in, [](auto time) { return time * 4; });
 	write(out, item.cast_delay, in);
 	write(out, item.recast_delay, in);
-	advance(out, 2, in);
+	advance<2>(out, in);
 	write(out, item.item_level, in);
 }
 
@@ -97,53 +101,57 @@ void write_weapon(std::ofstream& out, item const& item, std::ifstream& in) {
 	write(out, item.races, in);
 	write(out, item.jobs, in);
 
-	advance(out, 4, in);
+	advance<4>(out, in);
 	write(out, item.damage, in);
 	write(out, item.delay, in);
-	advance(out, 2, in);
+	advance<2>(out, in);
 	write(out, item.skill, in);
-	advance(out, 5, in);
+	advance<5>(out, in);
 	write(out, item.max_charges, in);
 	write<std::uint8_t>(out, item.cast_time, in, [](auto time) { return time * 4; });
 	write(out, item.cast_delay, in);
 	write(out, item.recast_delay, in);
-	advance(out, 2, in);
+	advance<2>(out, in);
 	write(out, item.item_level, in);
 }
 
 template<typename T>
 T read(std::ifstream& in) {
-	auto buffer = new std::uint8_t[sizeof(T)];
-	in.read(reinterpret_cast<char*>(buffer), sizeof(T));
+	static auto buffer = std::array<std::uint8_t, sizeof(T)>{};
+	static auto buffer_data = reinterpret_cast<char*>(buffer.data());
+	static auto buffer_value_ptr = reinterpret_cast<T const*>(buffer.data());
+	buffer = {};
+	in.read(buffer_data, sizeof(T));
 	for (auto i = 0; i < sizeof(T); ++i) {
 		buffer[i] = buffer[i] << 3 | buffer[i] >> 5;
 	}
 
-	auto value = *reinterpret_cast<T*>(buffer);
-	delete[] buffer;
-	return value;
+	return *buffer_value_ptr;
 }
 
 template<typename T>
 void write(std::ofstream& out, T const& value) {
-	auto read_buffer = reinterpret_cast<std::uint8_t const*>(&value);
-	auto buffer = new char[sizeof(T)];
+	static auto buffer = std::array<std::uint8_t, sizeof(T)>{};
+	static auto buffer_data = reinterpret_cast<char*>(buffer.data());
+	buffer = {};
+	auto read_buffer = reinterpret_cast<char const*>(&value);
 	for (auto i = 0; i < sizeof(T); ++i) {
 		buffer[i] = read_buffer[i] << 5 | read_buffer[i] >> 3;
 	}
-	out.write(buffer, sizeof(T));
+	out.write(buffer_data, sizeof(T));
 	out.flush();
-	delete[] buffer;
 }
 
-void write(std::ofstream& out, char const* value, std::size_t size) {
-	auto buffer = new char[size];
+template<std::size_t N>
+void write(std::ofstream& out, char const* value, std::size_t size = N) {
+	static auto buffer = std::array<std::uint8_t, N>{};
+	static auto buffer_data = reinterpret_cast<char*>(buffer.data());
+	buffer = {};
 	for (auto i = 0; i < size; ++i) {
 		buffer[i] = value[i] << 5 | value[i] >> 3;
 	}
-	out.write(buffer, size);
+	out.write(buffer_data, size);
 	out.flush();
-	delete[] buffer;
 }
 
 enum class string_type : std::uint32_t {
@@ -182,7 +190,7 @@ void assert(bool condition, T id, Args... args) {
 }
 
 std::size_t index(std::ifstream& in) {
-	return in.tellg() % 0xC00;
+	return in.tellg() % ::items::entry_size;
 }
 
 void adjust_entry(string_entry& entry, std::optional<std::string> const& option) {
@@ -211,16 +219,18 @@ void write_strings(std::ofstream& out, item const& item, std::ifstream& in) {
 		table.emplace_back(offset, type);
 	}
 
+	static auto buffer = std::array<std::uint8_t, ::items::string_size>{};
+	static auto buffer_data = reinterpret_cast<char*>(buffer.data());
 	for (std::size_t i = 0; i < count; ++i) {
 		auto start = index(in);
 		auto& entry = table[i];
 		auto max = i + 1 < count
 			? static_cast<std::size_t>(table[i + 1].offset) + string_offset
-			: 0x280;
+			: ::items::string_offset;
+
+		buffer = {};
 
 		auto buffer_size = max - start;
-		auto buffer = std::vector<std::byte>{buffer_size};
-		auto buffer_data = reinterpret_cast<char*>(buffer.data());
 		in.read(buffer_data, buffer_size);
 		for (auto j = 0; j < buffer_size; ++j) {
 			buffer[j] = buffer[j] << 3 | buffer[j] >> 5;
@@ -231,9 +241,9 @@ void write_strings(std::ofstream& out, item const& item, std::ifstream& in) {
 		if (validate) {
 			if (entry.type == string_type::string) {
 				assert(buffer_size >= 0x1C, item.id, "String buffer too small", i);
-				assert(buffer[0] == std::byte{1}, item.id, "String buffer start not 0x01", i);
+				assert(buffer[0] == 1, item.id, "String buffer start not 0x01", i);
 				for (auto j = 1; j < std::min(buffer_size, static_cast<std::size_t>(0x1C)); ++j) {
-					assert(buffer[j] == std::byte{0}, item.id, "String buffer not 0x00", i, j);
+					assert(buffer[j] == 0, item.id, "String buffer not 0x00", i, j);
 				}
 
 				if (i + 1 < count) {
@@ -282,21 +292,21 @@ void write_strings(std::ofstream& out, item const& item, std::ifstream& in) {
 	}
 
 	for (auto const& entry : table) {
-		write(out, entry.value.data(), entry.value.size());
+		write<::items::string_size>(out, entry.value.data(), entry.value.size());
 	}
 
-	out.seekp(0x280 - out.tellp() % 0xC00, std::ios_base::cur);
+	out.seekp(::items::string_offset - out.tellp() % ::items::entry_size, std::ios_base::cur);
 }
 
 void write_item(std::ofstream& out, item const& item, std::streamoff string_offset, std::ifstream& in) {
 	auto origin = out.tellp();
 	write_basic(out, item.id, in);
-	advance(out, 2, in);
+	advance<2>(out, in);
 
 	write(out, item.flags, in);
 	write(out, item.stack, in);
 	write(out, item.type, in);
-	advance(out, 2, in);
+	advance<2>(out, in);
 	write(out, item.targets, in);
 
 	if (item.id <= 0x0FFF) {
@@ -321,14 +331,14 @@ void write_item(std::ofstream& out, item const& item, std::streamoff string_offs
 		// Maze
 	}
 
-	seek(out, origin + string_offset, in);
+	seek<::items::entry_size>(out, origin + string_offset, in);
 
 	write_strings(out, item, in);
 }
 
 int main(int argc, char** argv) {
-	std::filesystem::path resources_path{argv[1]};
-	std::filesystem::path pol_path{argv[2]};
+	auto resources_path = std::filesystem::path{argv[1]};
+	auto pol_path = std::filesystem::path{argv[2]};
 
 	auto decode = false;
 	auto backup = false;
@@ -361,7 +371,7 @@ int main(int argc, char** argv) {
 			std::cout << "Restored " << (file.directory / file.filename).string() << std::endl;
 		}
 	} else {
-		::items items{resources_path};
+		auto items = ::items{resources_path};
 
 		for (auto const& file : files) {
 			std::cout << "Doing " << (file.directory / file.filename).string() << std::endl;
@@ -371,22 +381,22 @@ int main(int argc, char** argv) {
 			auto out_directory = resources_path / "results" / file.directory;
 			std::filesystem::create_directories(out_directory);
 
-			std::ifstream in{pol_path / file.directory / file.filename, std::ios::binary};
-			std::ofstream out{out_directory / file.filename, std::ios::binary};
+			auto in = std::ifstream{pol_path / file.directory / file.filename, std::ios::binary};
+			auto out = std::ofstream{out_directory / file.filename, std::ios::binary};
 
 			for (auto i = file.min_id; i < file.max_id; ++i) {
 				if (items.contains(i)) {
 					write_item(out, items[i], file.string_offset, in);
 				}
 
-				seek(out, 0xC00 * (static_cast<std::streamoff>(i - file.min_id) + 1), in);
+				seek<::items::entry_size>(out, ::items::entry_size * (static_cast<std::streamoff>(i - file.min_id) + 1), in);
 			}
 
 			if (validate && file.min_id != 0xFFFF) {
 				auto current = in.tellg();
 				in.seekg(0, std::ios_base::end);
 				auto last = in.tellg();
-				assert(current == last, "file size", "Input file not fully processed", last - current, static_cast<double>(last - current) / 0xC00);
+				assert(current == last, "file size", "Input file not fully processed", last - current, static_cast<double>(last - current) / ::items::entry_size);
 			}
 		}
 
@@ -394,22 +404,24 @@ int main(int argc, char** argv) {
 			std::cout << std::endl;
 
 			for (auto const& file : files) {
-				auto dec_directory = resources_path / "decoded" / file.directory;
-				std::filesystem::create_directories(dec_directory);
+				auto decoded_directory = resources_path / "decoded" / file.directory;
+				std::filesystem::create_directories(decoded_directory);
 
-				std::ifstream out{resources_path / file.directory / file.filename, std::ios::binary};
-				std::ofstream dec{dec_directory / file.filename, std::ios::binary};
+				auto out = std::ifstream{resources_path / file.directory / file.filename, std::ios::binary};
+				auto decoded = std::ofstream{decoded_directory / file.filename, std::ios::binary};
 
+				auto buffer = std::array<std::uint8_t, ::items::entry_size>{};
+				auto buffer_data = reinterpret_cast<char*>(buffer.data());
 				for (auto i = file.min_id; i < file.max_id; ++i) {
-					std::uint8_t buffer[0xC00]{};
-					out.read(reinterpret_cast<char*>(buffer), sizeof buffer);
+					buffer = {};
+					out.read(buffer_data, sizeof buffer);
 					for (auto& value : buffer) {
 						value = value << 3 | value >> 5;
 					}
-					dec.write(reinterpret_cast<char*>(buffer), sizeof buffer);
+					decoded.write(buffer_data, sizeof buffer);
 				}
 
-				std::cout << "Decoded " << (dec_directory / file.filename).string() << std::endl;
+				std::cout << "Decoded " << (decoded_directory / file.filename).string() << std::endl;
 			}
 		}
 
@@ -417,12 +429,12 @@ int main(int argc, char** argv) {
 			std::cout << std::endl;
 
 			for (auto const& file : files) {
-				auto bak_directory = resources_path / "backup" / file.directory;
-				std::filesystem::create_directories(bak_directory);
+				auto backup_directory = resources_path / "backup" / file.directory;
+				std::filesystem::create_directories(backup_directory);
 
-				std::filesystem::copy_file(pol_path / file.directory / file.filename, bak_directory / file.filename, std::filesystem::copy_options::overwrite_existing);
+				std::filesystem::copy_file(pol_path / file.directory / file.filename, backup_directory / file.filename, std::filesystem::copy_options::overwrite_existing);
 
-				std::cout << "Backed up " << (bak_directory / file.filename).string() << std::endl;
+				std::cout << "Backed up " << (backup_directory / file.filename).string() << std::endl;
 			}
 		}
 	}

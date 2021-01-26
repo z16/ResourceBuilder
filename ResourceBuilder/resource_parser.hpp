@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <map>
 #include <sstream>
 #include <fstream>
@@ -9,7 +10,7 @@
 #include <filesystem>
 
 template<typename T>
-void parse_resources(std::filesystem::path const& path, std::function<void(T&, std::string const&, std::string const&)> mapper, std::map<int, T>& map) {
+void parse_resources(std::filesystem::path const& path, std::function<void(T&, std::string const&, std::string const&)> mapper, std::map<std::uint32_t, T>& map) {
 	if (!std::filesystem::exists(path)) {
 		return;
 	}

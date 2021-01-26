@@ -1,5 +1,6 @@
 #include "items.hpp"
 
+#include <cstdint>
 #include <string>
 #include <map>
 #include <string_view>
@@ -38,10 +39,10 @@ items::items(std::filesystem::path windower_path) : resources_path{std::move(win
 	}, data);
 }
 
-bool items::contains(int id) const {
+bool items::contains(std::uint32_t id) const {
 	return data.find(id) != data.end();
 }
 
-item const& items::operator[](int const index) const {
+item const& items::operator[](std::uint32_t const index) const {
 	return data.at(index);
 }
