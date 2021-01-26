@@ -418,14 +418,14 @@ int main(int argc, char** argv)
     {
         for (auto const& file : files)
         {
-            auto bak_file = resources_path / "backup" / file.directory / file.filename;
-            if (!std::filesystem::exists(bak_file))
+            auto backup_file = resources_path / "backup" / file.directory / file.filename;
+            if (!std::filesystem::exists(backup_file))
             {
                 std::cout << "No backup file found for " << (file.directory / file.filename).string() << std::endl;
                 continue;
             }
 
-            std::filesystem::copy_file(bak_file, pol_path / file.directory / file.filename, std::filesystem::copy_options::overwrite_existing);
+            std::filesystem::copy_file(backup_file, pol_path / file.directory / file.filename, std::filesystem::copy_options::overwrite_existing);
             std::cout << "Restored " << (file.directory / file.filename).string() << std::endl;
         }
     }
@@ -435,9 +435,9 @@ int main(int argc, char** argv)
 
         for (auto const& file : files)
         {
-            std::cout << "Doing " << file.directory << "/" << file.filename << std::endl;
-            std::cout << "  > Reading from: " << (pol_path / file.directory / file.filename).string().c_str() << std::endl;
-            std::cout << "  > Writing to: " << (resources_path / file.directory / file.filename).string().c_str() << std::endl;
+            std::cout << "Doing " << (file.directory / file.filename).string() << std::endl;
+            std::cout << "  > Reading from: " << (pol_path / file.directory / file.filename).string() << std::endl;
+            std::cout << "  > Writing to: " << (resources_path / file.directory / file.filename).string() << std::endl;
 
             auto out_directory = resources_path / "results" / file.directory;
             std::filesystem::create_directories(out_directory);
