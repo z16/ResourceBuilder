@@ -230,42 +230,44 @@ void write_strings(std::ofstream& out, item const& item, std::ifstream& in)
     auto count = read<std::uint32_t>(in);
     std::vector<string_entry> table;
     table.reserve(count);
-    for (auto i = 0; i < count; ++i)
+    for (std::size_t i = 0; i < count; ++i)
     {
         auto offset = read<std::uint32_t>(in);
         auto type = read<string_type>(in);
         table.emplace_back(offset, type);
     }
 
-    for (auto i = 0; i < count; ++i)
+    for (std::size_t i = 0; i < count; ++i)
     {
         auto start = index(in);
         auto& entry = table[i];
-        auto max = i < count - 1
-            ? table[i + 1].offset + string_offset
+        auto max = i + 1 < count
+            ? static_cast<std::size_t>(table[i + 1].offset) + string_offset
             : 0x280;
 
         auto buffer_size = max - start;
-        auto buffer = new std::uint8_t[buffer_size];
-        in.read(reinterpret_cast<char*>(buffer), buffer_size);
+        auto buffer = std::vector<std::byte>{buffer_size};
+        auto buffer_data = reinterpret_cast<char*>(buffer.data());
+        in.read(buffer_data, buffer_size);
         for (auto j = 0; j < buffer_size; ++j)
         {
             buffer[j] = buffer[j] << 3 | buffer[j] >> 5;
         }
 
-        entry.value = {reinterpret_cast<char*>(buffer), buffer_size};
+        entry.value = {buffer_data, buffer_size};
 
         if (validate)
         {
             if (entry.type == string_type::string)
             {
-                assert(buffer[0] == 1, item.id, "String buffer start not 0x01", i);
-                for (auto j = 1; j < 0x1C; ++j)
+                assert(buffer_size >= 0x1C, item.id, "String buffer too small", i);
+                assert(buffer[0] == std::byte{1}, item.id, "String buffer start not 0x01", i);
+                for (auto j = 1; j < std::min(buffer_size, static_cast<std::size_t>(0x1C)); ++j)
                 {
-                    assert(buffer[j] == 0, item.id, "String buffer not 0x00", i, j);
+                    assert(buffer[j] == std::byte{0}, item.id, "String buffer not 0x00", i, j);
                 }
 
-                if (i < count - 1)
+                if (i + 1 < count)
                 {
                     auto length = strlen(entry.value.data() + 0x1C);
                     assert((length + 4 & ~3) == buffer_size - 0x1C, item.id, "Mismatched string size", i);
@@ -280,14 +282,12 @@ void write_strings(std::ofstream& out, item const& item, std::ifstream& in)
                 assert(false, item.id, "Other other?");
             }
         }
-
-        delete[] buffer;
     }
 
     write(out, count);
 
-    auto offset = sizeof count + count * (sizeof string_entry::offset + sizeof string_entry::type);
-    for (auto i = 0; i < count; ++i)
+    auto offset = static_cast<std::uint32_t>(sizeof count + count * (sizeof string_entry::offset + sizeof string_entry::type));
+    for (std::size_t i = 0; i < count; ++i)
     {
         auto& entry = table[i];
 
@@ -311,7 +311,7 @@ void write_strings(std::ofstream& out, item const& item, std::ifstream& in)
             break;
         }
 
-        offset += entry.value.size();
+        offset += static_cast<std::uint32_t>(entry.value.size());
     }
 
     for (auto const& entry : table)
@@ -452,7 +452,7 @@ int main(int argc, char** argv)
                     write_item(out, items[i], file.string_offset, in);
                 }
 
-                seek(out, 0xC00 * (i - file.min_id + 1), in);
+                seek(out, 0xC00 * (static_cast<std::streamoff>(i - file.min_id) + 1), in);
             }
 
             if (validate && file.min_id != 0xFFFF)
@@ -478,7 +478,7 @@ int main(int argc, char** argv)
 
                 for (auto i = file.min_id; i < file.max_id; ++i)
                 {
-                    std::uint8_t buffer[0xC00];
+                    std::uint8_t buffer[0xC00]{};
                     out.read(reinterpret_cast<char*>(buffer), sizeof buffer);
                     for (auto& value : buffer)
                     {
