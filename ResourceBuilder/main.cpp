@@ -31,12 +31,33 @@ std::vector<file> files{
 	//{"ROM\\174", "48.DAT",  0xFFFF, 0x0000, 0x10},
 };
 
+void read_into(std::ifstream& in, std::uint8_t* buffer, std::size_t size) {
+	auto buffer_data = reinterpret_cast<char*>(buffer);
+	in.read(buffer_data, size);
+	for (std::size_t i = 0; i < size; ++i) {
+		buffer[i] = buffer[i] << 3 | buffer[i] >> 5;
+	}
+}
+
+template<std::size_t N>
+void read_into(std::ifstream& in, std::array<std::uint8_t, N>& buffer) {
+	read_into(in, buffer.data(), N);
+}
+
+void write_from(std::ofstream& out, std::uint8_t const* buffer, std::size_t size) {
+	for (std::size_t i = 0; i < size; ++i) {
+		out.put(buffer[i] << 5 | buffer[i] >> 3);
+	}
+}
+
+template<std::size_t N>
+void write_from(std::ofstream& out, std::array<std::uint8_t, N>& buffer) {
+	write_from(out, buffer.data(), N);
+}
+
 template<typename T>
 void write_basic(std::ofstream& out, T const& value, std::ifstream& in) {
-	auto data = reinterpret_cast<std::uint8_t const*>(&value);
-	for (auto i = 0; i < sizeof value; ++i) {
-		out.put(static_cast<std::uint8_t>(data[i] << 5 | data[i] >> 3));
-	}
+	write_from(out, reinterpret_cast<std::uint8_t const*>(&value), sizeof(T));
 	in.seekg(sizeof value, std::ios_base::cur);
 }
 
@@ -118,36 +139,21 @@ void write_weapon(std::ofstream& out, item const& item, std::ifstream& in) {
 template<typename T>
 T read(std::ifstream& in) {
 	static auto buffer = std::array<std::uint8_t, sizeof(T)>{};
-	static auto buffer_data = reinterpret_cast<char*>(buffer.data());
 	static auto buffer_value_ptr = reinterpret_cast<T const*>(buffer.data());
 	buffer = {};
-	in.read(buffer_data, sizeof(T));
-	for (auto i = 0; i < sizeof(T); ++i) {
-		buffer[i] = buffer[i] << 3 | buffer[i] >> 5;
-	}
+	read_into(in, buffer);
 
 	return *buffer_value_ptr;
 }
 
-template<std::size_t N>
-void write(std::ofstream& out, std::uint8_t const* value, std::size_t size) {
-	static auto buffer = std::array<std::uint8_t, N>{};
-	static auto buffer_data = reinterpret_cast<char const*>(buffer.data());
-	buffer = {};
-	for (auto i = 0; i < size; ++i) {
-		buffer[i] = value[i] << 5 | value[i] >> 3;
-	}
-	out.write(buffer_data, size);
-}
-
 template<typename T>
 void write(std::ofstream& out, T const& value) {
-	write<sizeof T>(out, reinterpret_cast<std::uint8_t const*>(&value), sizeof T);
+	write_from(out, reinterpret_cast<std::uint8_t const*>(&value), sizeof T);
 }
 
 template<std::size_t N>
 void write(std::ofstream& out, char const* value, std::size_t size = N) {
-	write<N>(out, reinterpret_cast<std::uint8_t const*>(value), size);
+	write_from(out, reinterpret_cast<std::uint8_t const*>(value), size);
 }
 
 enum class string_type : std::uint32_t {
@@ -226,10 +232,7 @@ void write_strings(std::ofstream& out, item const& item, std::ifstream& in) {
 		buffer = {};
 
 		auto buffer_size = max - start;
-		in.read(buffer_data, buffer_size);
-		for (auto j = 0; j < buffer_size; ++j) {
-			buffer[j] = buffer[j] << 3 | buffer[j] >> 5;
-		}
+		read_into(in, buffer.data(), buffer_size);
 
 		entry.value = {buffer_data, buffer_size};
 
@@ -406,13 +409,10 @@ int main(int argc, char** argv) {
 				auto decoded = std::ofstream{decoded_directory / file.filename, std::ios::binary};
 
 				auto buffer = std::array<std::uint8_t, ::items::entry_size>{};
-				auto buffer_data = reinterpret_cast<char*>(buffer.data());
+				auto buffer_data = reinterpret_cast<char const*>(buffer.data());
 				for (auto i = file.min_id; i < file.max_id; ++i) {
 					buffer = {};
-					out.read(buffer_data, sizeof buffer);
-					for (auto& value : buffer) {
-						value = value << 3 | value >> 5;
-					}
+					read_into(out, buffer);
 					decoded.write(buffer_data, sizeof buffer);
 				}
 
