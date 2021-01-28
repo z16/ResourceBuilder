@@ -129,29 +129,25 @@ T read(std::ifstream& in) {
 	return *buffer_value_ptr;
 }
 
-template<typename T>
-void write(std::ofstream& out, T const& value) {
-	static auto buffer = std::array<std::uint8_t, sizeof(T)>{};
-	static auto buffer_data = reinterpret_cast<char*>(buffer.data());
-	buffer = {};
-	auto read_buffer = reinterpret_cast<char const*>(&value);
-	for (auto i = 0; i < sizeof(T); ++i) {
-		buffer[i] = read_buffer[i] << 5 | read_buffer[i] >> 3;
-	}
-	out.write(buffer_data, sizeof(T));
-	out.flush();
-}
-
 template<std::size_t N>
-void write(std::ofstream& out, char const* value, std::size_t size = N) {
+void write(std::ofstream& out, std::uint8_t const* value, std::size_t size) {
 	static auto buffer = std::array<std::uint8_t, N>{};
-	static auto buffer_data = reinterpret_cast<char*>(buffer.data());
+	static auto buffer_data = reinterpret_cast<char const*>(buffer.data());
 	buffer = {};
 	for (auto i = 0; i < size; ++i) {
 		buffer[i] = value[i] << 5 | value[i] >> 3;
 	}
 	out.write(buffer_data, size);
-	out.flush();
+}
+
+template<typename T>
+void write(std::ofstream& out, T const& value) {
+	write<sizeof T>(out, reinterpret_cast<std::uint8_t const*>(&value), sizeof T);
+}
+
+template<std::size_t N>
+void write(std::ofstream& out, char const* value, std::size_t size = N) {
+	write<N>(out, reinterpret_cast<std::uint8_t const*>(value), size);
 }
 
 enum class string_type : std::uint32_t {
@@ -201,10 +197,9 @@ void adjust_entry(string_entry& entry, std::optional<std::string> const& option)
 	auto const& value = option.value();
 
 	auto size = 0x1C + value.size() + 4 & ~3;
-	auto buffer = new char[size] {};
-	auto temp = entry.value.substr(0, 0x1C) + value;
-	std::copy(temp.cbegin(), temp.cend(), buffer);
-	entry.value = {buffer, size};
+	auto adjusted = std::string(size, '\0');
+	std::copy_n(entry.value.cbegin(), 0x1C, adjusted.begin());
+	std::copy(value.cbegin(), value.cend(), adjusted.begin() + 0x1C);
 }
 
 void write_strings(std::ofstream& out, item const& item, std::ifstream& in) {
@@ -376,7 +371,7 @@ int main(int argc, char** argv) {
 		for (auto const& file : files) {
 			std::cout << "Doing " << (file.directory / file.filename).string() << std::endl;
 			std::cout << "  > Reading from: " << (pol_path / file.directory / file.filename).string() << std::endl;
-			std::cout << "  > Writing to: " << (resources_path / file.directory / file.filename).string() << std::endl;
+			std::cout << "  > Writing to: " << (resources_path / "results" / file.directory / file.filename).string() << std::endl;
 
 			auto out_directory = resources_path / "results" / file.directory;
 			std::filesystem::create_directories(out_directory);
@@ -407,7 +402,7 @@ int main(int argc, char** argv) {
 				auto decoded_directory = resources_path / "decoded" / file.directory;
 				std::filesystem::create_directories(decoded_directory);
 
-				auto out = std::ifstream{resources_path / file.directory / file.filename, std::ios::binary};
+				auto out = std::ifstream{resources_path / "results" / file.directory / file.filename, std::ios::binary};
 				auto decoded = std::ofstream{decoded_directory / file.filename, std::ios::binary};
 
 				auto buffer = std::array<std::uint8_t, ::items::entry_size>{};
