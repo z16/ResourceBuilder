@@ -206,6 +206,7 @@ void adjust_entry(string_entry& entry, std::optional<std::string> const& option)
 	auto adjusted = std::string(size, '\0');
 	std::copy_n(entry.value.cbegin(), 0x1C, adjusted.begin());
 	std::copy(value.cbegin(), value.cend(), adjusted.begin() + 0x1C);
+	entry.value = adjusted;
 }
 
 void write_strings(std::ofstream& out, item const& item, std::ifstream& in) {
@@ -437,6 +438,4 @@ int main(int argc, char** argv) {
 	std::cout << std::endl;
 
 	std::cout << "Done!" << std::endl;
-
-	std::cin.get();
 }
