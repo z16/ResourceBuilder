@@ -106,7 +106,6 @@ void write_armor(std::ofstream& out, item const& item, std::ifstream& in) {
 	write(out, item.jobs, in);
 
 	write(out, item.superior_level, in);
-	advance<1>(out, in);
 	write(out, item.shield_size, in);
 	write(out, item.max_charges, in);
 	write<std::uint8_t>(out, item.cast_time, in, [](auto time) { return time * 4; });
@@ -213,7 +212,7 @@ void write_strings(std::ofstream& out, item const& item, std::ifstream& in) {
 	auto string_offset = index(in);
 
 	auto count = read<std::uint32_t>(in);
-	std::vector<string_entry> table;
+	auto table = std::vector<string_entry>{};
 	table.reserve(count);
 	for (std::size_t i = 0; i < count; ++i) {
 		auto offset = read<std::uint32_t>(in);
