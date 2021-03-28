@@ -338,7 +338,8 @@ int main(int argc, char** argv) {
 	auto resources_path = std::filesystem::path{argv[1]};
 	auto pol_path = std::filesystem::path{argv[2]};
 
-	auto decode = false;
+	auto decode_rb = false;
+	auto decode_pol = false;
 	auto backup = false;
 	auto restore = false;
 
@@ -346,8 +347,10 @@ int main(int argc, char** argv) {
 		auto arg = std::string{argv[i]};
 		if (arg == "--validate") {
 			validate = true;
-		} else if (arg == "--decode") {
-			decode = true;
+		} else if (arg == "--decode-rb") {
+			decode_rb = true;
+		} else if (arg == "--decode-pol") {
+			decode_pol = true;
 		} else if (arg == "--backup") {
 			backup = true;
 		} else if (arg == "--restore") {
@@ -398,25 +401,47 @@ int main(int argc, char** argv) {
 			}
 		}
 
-		if (decode) {
+		if (decode_rb) {
 			std::cout << std::endl;
 
 			for (auto const& file : files) {
-				auto decoded_directory = resources_path / "decoded" / file.directory;
+				auto decoded_directory = resources_path / "decoded-rb" / file.directory;
 				std::filesystem::create_directories(decoded_directory);
 
-				auto out = std::ifstream{resources_path / "results" / file.directory / file.filename, std::ios::binary};
+				auto in = std::ifstream{resources_path / "results" / file.directory / file.filename, std::ios::binary};
 				auto decoded = std::ofstream{decoded_directory / file.filename, std::ios::binary};
 
 				auto buffer = std::array<std::uint8_t, ::items::entry_size>{};
 				auto buffer_data = reinterpret_cast<char const*>(buffer.data());
 				for (auto i = file.min_id; i < file.max_id; ++i) {
 					buffer = {};
-					read_into(out, buffer);
+					read_into(in, buffer);
 					decoded.write(buffer_data, sizeof buffer);
 				}
 
-				std::cout << "Decoded " << (decoded_directory / file.filename).string() << std::endl;
+				std::cout << "Decoded (RB) " << (decoded_directory / file.filename).string() << std::endl;
+			}
+		}
+
+		if (decode_pol) {
+			std::cout << std::endl;
+
+			for (auto const& file : files) {
+				auto decoded_directory = resources_path / "decoded-pol" / file.directory;
+				std::filesystem::create_directories(decoded_directory);
+
+				auto in = std::ifstream{pol_path / file.directory / file.filename, std::ios::binary};
+				auto decoded = std::ofstream{decoded_directory / file.filename, std::ios::binary};
+
+				auto buffer = std::array<std::uint8_t, ::items::entry_size>{};
+				auto buffer_data = reinterpret_cast<char const*>(buffer.data());
+				for (auto i = file.min_id; i < file.max_id; ++i) {
+					buffer = {};
+					read_into(in, buffer);
+					decoded.write(buffer_data, sizeof buffer);
+				}
+
+				std::cout << "Decoded (POL) " << (decoded_directory / file.filename).string() << std::endl;
 			}
 		}
 

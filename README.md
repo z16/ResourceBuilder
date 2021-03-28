@@ -10,7 +10,8 @@ Required parameters:
 
 Optional flags:
 * `--validate` Enables basic validation of some of the assumptions used for its algorithms, otherwise it will proceed with no assumptions, which is riskier but faster.
-* `--decode` Will generate decoded DAT files in addition to the proper files for the game (in its own folder `decoded/`).
+* `--decode-rb` Will generate decoded DAT files from the ResourceBuilder output, in addition to the proper files for the game (in its own folder `decoded-rb/`).
+* `--decode-pol` Will generate decoded DAT files from the current POL files (in its own folder `decoded-pol/`).
 * `--backup` Will back up current FFXI files in folder `backup/`. Off by default, since it doesn't overwrite them by default either. Will always overwrite existing backups if used, so if the game files were modified this will back up the modified files and possibly overwrite existing backups.
 * `--restore` Will restore game files from existing backups. Will not run the builder mechanism and abort immediately upon restoring the backups.
 
