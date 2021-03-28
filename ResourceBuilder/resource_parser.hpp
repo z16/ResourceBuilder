@@ -55,16 +55,21 @@ void parse_resources(std::filesystem::path const& path, std::function<void(T&, s
 			}
 
 			if (c == '\\') {
-				in_escape = !in_escape;
+				in_escape = true;
 				continue;
 			}
 
 			if (in_quote) {
-				current->push_back(c);
+				if (c == '"') {
+					in_quote = false;
+				} else {
+					current->push_back(c);
+				}
 				continue;
 			}
 
 			if (c == '"') {
+				in_quote = true;
 				continue;
 			}
 
