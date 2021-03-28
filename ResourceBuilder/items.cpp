@@ -25,7 +25,7 @@ items::items(std::filesystem::path windower_path) : resources_path{std::move(win
 		else if (key == "superior_level") item.superior_level = std::stoi(value);
 		else if (key == "shield_size")    item.shield_size =    std::stoi(value);
 		else if (key == "max_charges")    item.max_charges =    std::stoi(value);
-		else if (key == "cast_time")      item.cast_time =      std::stoi(value);
+		else if (key == "cast_time")      item.cast_time =      static_cast<std::uint8_t>(std::stod(value) * 4 + 0.001);
 		else if (key == "cast_delay")     item.cast_delay =     std::stoi(value);
 		else if (key == "recast_delay")   item.recast_delay =   std::stoi(value);
 		else if (key == "item_level")     item.item_level =     std::stoi(value);

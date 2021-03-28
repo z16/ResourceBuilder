@@ -84,19 +84,8 @@ void write(std::ofstream& out, std::optional<T> const& entry, std::ifstream& in)
 	write_basic(out, entry.value(), in);
 }
 
-template<typename T>
-void write(std::ofstream& out, std::optional<T> const& entry, std::ifstream& in, std::function<T(T)> selector) {
-	if (!entry.has_value()) {
-		advance<sizeof entry.value()>(out, in);
-		return;
-	}
-
-	T value = selector(entry.value());
-	write_basic(out, value, in);
-}
-
 void write_usable(std::ofstream& out, item const& item, std::ifstream& in) {
-	write<std::uint8_t>(out, item.cast_time, in, [](auto time) { return time * 4; });
+	write(out, item.cast_time, in);
 }
 
 void write_armor(std::ofstream& out, item const& item, std::ifstream& in) {
@@ -108,7 +97,7 @@ void write_armor(std::ofstream& out, item const& item, std::ifstream& in) {
 	write(out, item.superior_level, in);
 	write(out, item.shield_size, in);
 	write(out, item.max_charges, in);
-	write<std::uint8_t>(out, item.cast_time, in, [](auto time) { return time * 4; });
+	write(out, item.cast_time, in);
 	write(out, item.cast_delay, in);
 	write(out, item.recast_delay, in);
 	advance<2>(out, in);
@@ -128,7 +117,7 @@ void write_weapon(std::ofstream& out, item const& item, std::ifstream& in) {
 	write(out, item.skill, in);
 	advance<5>(out, in);
 	write(out, item.max_charges, in);
-	write<std::uint8_t>(out, item.cast_time, in, [](auto time) { return time * 4; });
+	write(out, item.cast_time, in);
 	write(out, item.cast_delay, in);
 	write(out, item.recast_delay, in);
 	advance<2>(out, in);
